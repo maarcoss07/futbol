@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="es"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2f7d32">
+<title>Banco de ejercicios</title>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<style>
+:root{--bg:#f4f5f7;--fg:#161a1f;--pn:#fff;--ln:#d5d9df;--ac:#0ea5e9;--mu:#667085}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1318;--fg:#e8ebef;--pn:#1a2028;--ln:#2d3640;--mu:#93a0b0}}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg);color:var(--fg);font:15px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding-top:env(safe-area-inset-top,0px)}
+.card{background:var(--pn);border:1px solid var(--ln);border-radius:12px}
+.inp{width:100%;box-sizing:border-box;background:var(--bg);color:var(--fg);border:1px solid var(--ln);border-radius:10px;padding:10px 12px;font-size:16px}
+.btn{background:var(--pn);color:var(--fg);border:1px solid var(--ln);border-radius:10px;padding:10px 14px;min-height:44px;cursor:pointer;font:inherit}
+.btn.sm{min-height:34px;padding:4px 10px;font-size:13px}
+.btn.pri{background:var(--ac);border-color:var(--ac);color:#fff;font-weight:600}
+.chip{background:var(--pn);color:var(--fg);border:1px solid var(--ln);border-radius:99px;padding:7px 13px;min-height:38px;cursor:pointer;font:inherit;font-size:14px}
+.chip.on{background:var(--ac);border-color:var(--ac);color:#fff}
+.badge{font-size:11px;border:1px solid var(--ln);border-radius:99px;padding:2px 8px;white-space:nowrap}
+.tg{font-size:11px;background:var(--bg);border-radius:99px;padding:2px 8px}
+.lbl{display:block;font-size:12px;color:var(--mu);margin-bottom:4px}
+.thumb svg{width:100%;height:auto;display:block}
+.fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));width:58px;height:58px;border-radius:50%;border:0;background:var(--ac);color:#fff;font-size:30px;z-index:20;box-shadow:0 4px 14px #0005}
+.bar{position:fixed;left:0;right:0;bottom:0;display:flex;gap:8px;padding:8px 12px calc(8px + env(safe-area-inset-bottom,0px));background:var(--pn);border-top:1px solid var(--ln);z-index:20}
+.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:#000d;color:#fff;padding:8px 14px;border-radius:99px;z-index:50;font-size:14px;max-width:90%}
+</style></head>
+<body>
+<div id="app"><p class="p-6">Cargando…</p></div>
+<noscript>Necesitas activar JavaScript.</noscript>
+<script type="module" src="./app.js"></script>
+</body></html>
