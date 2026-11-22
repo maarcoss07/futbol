@@ -39,8 +39,7 @@ function login() {
   <div class="card p-4 grid gap-3"><input id="em" type="email" autocomplete="email" placeholder="Email" class="inp">
   <input id="pw" type="password" autocomplete="current-password" placeholder="Contraseña" class="inp">
   <div id="err" class="text-sm text-red-500"></div>
-  <button class="btn pri" data-act="login">Entrar</button><button class="btn" data-act="register">Crear cuenta</button>
-  <button class="btn" data-act="google">Continuar con Google</button>
+  <button class="btn pri" data-act="login">Entrar</button>
   <button class="text-sm underline p-2" data-act="reset">Olvidé mi contraseña</button></div></div>`;
 }
 async function auth(kind) {
