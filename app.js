@@ -55,7 +55,7 @@ function showList() {
   <div class="grid gap-2 mb-3"><input id="q" type="search" class="inp" placeholder="Buscar ejercicio..." value="${esc(F.q)}"><div id="phs" class="flex flex-wrap gap-1.5"></div>
   <div class="grid grid-cols-3 gap-2"><select id="ft" class="inp"></select><select id="fm" class="inp"></select><select id="fs" class="inp"></select></div></div>
   <div id="list" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"></div>
-  <p class="text-xs mt-6" style="color:var(--mu)">Tu UID (para las reglas de Firestore): ${esc(user.uid)}</p></div>
+  <div class="text-xs mt-6 flex flex-wrap items-center gap-2" style="color:var(--mu)"><span>UID: ${esc(user.uid)}</span><button class="btn sm" data-act="exp">Exportar copia</button><button class="btn sm" data-act="imp">Importar copia</button><input type="file" id="imp-f" accept=".json,application/json" hidden></div></div>
   <button class="fab" data-act="new" title="Nuevo ejercicio">＋</button>`;
   renderList();
 }
@@ -129,7 +129,22 @@ function addItem(inp, arr) {
   $(inp).value = ''; dirty = true; drawChips();
 }
 const toggle = (arr, v) => { const i = arr.indexOf(v); i < 0 ? arr.push(v) : arr.splice(i, 1); dirty = true; drawChips(); };
-
+async function exportar() {
+  try {
+    const D = await DB.exportAll(), a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(D)], {type: 'application/json'}));
+    a.download = `copia-ejercicios-${D.date.slice(0, 10)}.json`; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast(`Copia: ${D.exercises.length} ejercicios, ${D.sessions.length} entrenos`);
+  } catch (e) { toast('Error: ' + e.message); }
+}
+async function importar(f) {
+  try {
+    const D = JSON.parse(await f.text());
+    if (!confirm(`¿Restaurar ${D.exercises?.length || 0} ejercicios y ${D.sessions?.length || 0} entrenos? Los que tengan el mismo id se sobrescribirán.`)) return;
+    toast('Importando…'); toast(`Restaurados ${await DB.importAll(D)} elementos`);
+  } catch (e) { toast('Error: ' + e.message); }
+}
 /* ---------- Eventos ---------- */
 app.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
@@ -138,6 +153,7 @@ app.addEventListener('click', e => {
     login: () => auth('login'), register: () => auth('register'), google: () => auth('google'), reset: () => auth('reset'), logout: () => DB.logout(),
     new: () => edit(), edit: () => edit(ex()),
     goT: () => T.open(),
+    exp: exportar, imp: () => $('#imp-f').click(),
     dup: () => { DB.duplicateExercise(ex()).catch(err => toast('Error: ' + err.message)); toast('Duplicado'); },
     del: () => { const x = ex(); if (x && confirm(`¿Borrar "${x.title}"?`)) DB.deleteExercise(id).catch(err => toast('Error: ' + err.message)); },
     back: () => { if (dirty && !confirm('¿Descartar los cambios?')) return; board?.destroy(); board = null; showList(); },
@@ -148,12 +164,19 @@ app.addEventListener('click', e => {
   })[a]?.();
 });
 app.addEventListener('input', e => { if (e.target.id == 'q') { F.q = e.target.value; renderList(); } else if (view == 'edit') dirty = true; });
-app.addEventListener('change', e => { const m = {ft: 'tag', fm: 'mat', fs: 'sort'}[e.target.id]; if (m) { F[m] = e.target.value; renderList(); } });
+app.addEventListener('change', e => {
+  if (e.target.id == 'imp-f') { const f = e.target.files[0]; e.target.value = ''; f && importar(f); return; }
+  const m = {ft: 'tag', fm: 'mat', fs: 'sort'}[e.target.id]; if (m) { F[m] = e.target.value; renderList(); }
+});
 app.addEventListener('keydown', e => {
   if (e.key == 'Enter' && e.target.id == 'n-tag') addItem('#n-tag', d.tags);
   if (e.key == 'Enter' && e.target.id == 'n-mat') addItem('#n-mat', d.material);
 });
-
+const off = document.createElement('div');
+off.style.cssText = 'position:fixed;top:calc(env(safe-area-inset-top,0px) + 6px);right:8px;z-index:70;background:#b45309;color:#fff;font-size:12px;padding:3px 10px;border-radius:99px;display:none;pointer-events:none';
+off.textContent = 'Sin conexión · usando caché'; document.body.appendChild(off);
+const net = () => off.style.display = navigator.onLine ? 'none' : 'block';
+addEventListener('online', net); addEventListener('offline', net); net();
 /* ---------- Arranque ---------- */
 if (!DB.configured) {
   app.innerHTML = `<div class="max-w-sm mx-auto p-5 pt-16"><div class="card p-4"><b>Falta configurar Firebase</b><p class="mt-2 text-sm">Abre <code>db.js</code> y pega tu <code>firebaseConfig</code> en el bloque marcado.</p></div></div>`;
