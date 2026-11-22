@@ -29,7 +29,7 @@ const unflat = b => ({...b, arrows: (b.arrows || []).map(a => ({...a, p: a.p.red
 
 // ====== EQUIPOS DEL CLUB: UID del 1.er entrenador → [UIDs de sus segundos entrenadores] ======
 const EQUIPOS = {
-  'aE4xgApvUbcVNqMNnU1OjRPJPb03': ['UID_SEGUNDO_1', 'UID_SEGUNDO_2']
+  'aE4xgApvUbcVNqMNnU1OjRPJPb03': ['UID: ZQsXAvAPgKYZApf03kv01oAAKQ32', 'UID_SEGUNDO_2']
   // , 'UID_PRIMERO_OTRO_EQUIPO': ['UID_SEGUNDO_3']
 };
 const EQUIPO = Object.fromEntries(Object.entries(EQUIPOS).flatMap(([p, ss]) => ss.map(s => [s, p])));
