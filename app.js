@@ -51,7 +51,9 @@ async function auth(kind) {
 function showList() {
   view = 'list';
   app.innerHTML = `<div class="max-w-5xl mx-auto p-3 pb-28"><div class="flex items-center gap-2 mb-3">
-  <button class="chip on">Ejercicios <span id="cnt" class="text-xs"></span></button><button class="chip" data-act="goT">Entrenos</button><span class="mr-auto"></span><button class="btn sm" data-act="logout">Salir</button></div>  <div class="grid grid-cols-3 gap-2"><select id="ft" class="inp"></select><select id="fm" class="inp"></select><select id="fs" class="inp"></select></div></div>
+  <button class="chip on">Ejercicios <span id="cnt" class="text-xs"></span></button><button class="chip" data-act="goT">Entrenos</button><span class="mr-auto"></span><button class="btn sm" data-act="logout">Salir</button></div>
+  <div class="grid gap-2 mb-3"><input id="q" type="search" class="inp" placeholder="Buscar ejercicio..." value="${esc(F.q)}"><div id="phs" class="flex flex-wrap gap-1.5"></div>
+  <div class="grid grid-cols-3 gap-2"><select id="ft" class="inp"></select><select id="fm" class="inp"></select><select id="fs" class="inp"></select></div></div>
   <div id="list" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"></div>
   <p class="text-xs mt-6" style="color:var(--mu)">Tu UID (para las reglas de Firestore): ${esc(user.uid)}</p></div>
   <button class="fab" data-act="new" title="Nuevo ejercicio">＋</button>`;
@@ -158,7 +160,7 @@ if (!DB.configured) {
 } else {
   DB.onUser(u => {
     user = u; unsub?.(); unsub = null; list = [];
-    if (!u) { board?.destroy(); board = null; login(); return; }
+    if (!u) { T.watch(false); board?.destroy(); board = null; login(); return; }
     unsub = DB.watchExercises(arr => { list = arr; if (view == 'list') renderList(); },
       err => toast('Sin acceso a Firestore: revisa las reglas y tu UID (' + err.code + ')'));
       T.watch(true);
