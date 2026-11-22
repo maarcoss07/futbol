@@ -16,7 +16,8 @@ const ERR = {'auth/invalid-credential': 'Email o contraseña incorrectos', 'auth
   'auth/weak-password': 'Contraseña demasiado corta (mínimo 6)', 'auth/popup-blocked': 'Ventana de Google bloqueada: usa email y contraseña',
   'auth/popup-closed-by-user': '', 'auth/operation-not-allowed': 'Activa ese método en Firebase → Authentication'};
 
-let user = null, list = [], view = '', F = {q: '', ph: '', tag: '', mat: '', age: '', sort: 'old', scope: 'mine'}, d = null, board = null, dirty = false, unsub = null;
+let user = null, list = [], view = '', F = {q: '', ph: [], tag: [], mat: [], age: [], sort: 'old', scope: 'mine'}, fopen = '', d = null, board = null, dirty = false, unsub = null;
+const toggleF = (k, v) => { const a = F[k], i = a.indexOf(v); i < 0 ? a.push(v) : a.splice(i, 1); };
 
 function toast(m) {
   const t = document.createElement('div'); t.className = 'toast'; t.textContent = m; document.body.appendChild(t); setTimeout(() => t.remove(), 2600);
@@ -45,9 +46,8 @@ function login() {
 async function auth(kind) {
   const em = $('#em').value.trim(), pw = $('#pw').value;
   try {
-    if (kind == 'google') await DB.loginGoogle();
-    else if (kind == 'reset') { if (!em) throw {message: 'Escribe tu email primero'}; await DB.resetPass(em); toast('Email de recuperación enviado'); }
-    else await DB[kind == 'login' ? 'loginEmail' : 'registerEmail'](em, pw);
+    if (kind == 'reset') { if (!em) throw {message: 'Escribe tu email primero'}; await DB.resetPass(em); toast('Email de recuperación enviado'); }
+    else await DB.loginEmail(em, pw);
   } catch (e) { $('#err').textContent = ERR[e.code] ?? e.message; }
 }
 
@@ -60,7 +60,8 @@ function showList() {
   <button class="chip${F.scope == 'mine' ? ' on' : ''}" data-act="scope" data-v="mine">Mi equipo</button><button class="chip${F.scope == 'club' ? ' on' : ''}" data-act="scope" data-v="club">Club</button>
   <span class="mr-auto"></span><button class="btn sm" data-act="ia">✨ Crear con IA</button></div>
   <input id="q" class="inp" placeholder="Buscar…" value="${esc(F.q)}"><div class="flex gap-1.5 flex-wrap" id="phs"></div>
-  <div class="grid grid-cols-2 gap-2"><select id="ft" class="inp"></select><select id="fm" class="inp"></select><select id="fa" class="inp"></select><select id="fs" class="inp"></select></div></div>
+  <div class="flex gap-1.5 flex-wrap" id="fb"></div><div class="flex gap-1.5 flex-wrap" id="fp"></div>
+  <div class="flex gap-2 items-center"><select id="fs" class="inp"></select><button class="btn sm whitespace-nowrap" id="fc" data-act="fclear" hidden>Limpiar filtros</button></div></div>
   <div id="list" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"></div>
   <div class="text-xs mt-6 flex flex-wrap items-center gap-2" style="color:var(--mu)"><span>UID: ${esc(user.uid)}</span><button class="btn sm" data-act="exp">Exportar copia</button><button class="btn sm" data-act="imp">Importar copia</button><input type="file" id="imp-f" accept=".json,application/json" hidden></div></div>
   <button class="fab" data-act="new" title="Nuevo ejercicio">＋</button>`;
@@ -76,19 +77,28 @@ function card(e) {
   <button class="btn sm" data-act="dup" data-id="${e.id}">Duplicar</button><button class="btn sm" data-act="del" data-id="${e.id}">🗑</button></div></div></div>`;
 }
 function renderList() {
-  const club = F.scope == 'club', src = club ? C.items() : list, cx = club ? C.items() : [];
-  const tags = uniq(DT, 'tags', cx.flatMap(e => e.tags || [])), mats = uniq(DM, 'material', cx.flatMap(e => e.material || []));
-  $('#phs').innerHTML = [['', 'Todas'], ...Object.entries(PH)].map(([v, l]) => `<button class="chip${F.ph == v ? ' on' : ''}" data-act="fph" data-v="${v}">${l}</button>`).join('');
-  const opt = (arr, v, ph) => `<option value="">${ph}</option>` + arr.map(x => `<option${x == v ? ' selected' : ''}>${esc(x)}</option>`).join('');
-  const sorts = club ? {new: (a, b) => (b.ts || 0) - (a.ts || 0), az: (a, b) => a.title.localeCompare(b.title, 'es')}
+  const club = F.scope == 'club', src = club ? C.items() : list;
+  const cx = club ? {tag: src.flatMap(e => e.tags || []), mat: src.flatMap(e => e.material || [])} : {tag: [], mat: []};
+  // las opciones activas siempre se muestran, para poder desmarcarlas aunque no existan en esta vista
+  const opts = {age: AGES, tag: uniq(DT, 'tags', [...cx.tag, ...F.tag]), mat: uniq(DM, 'material', [...cx.mat, ...F.mat])};
+  const LB = {age: 'Edad', tag: 'Etiquetas', mat: 'Material'};
+  const chip = (act, k, v, on, l = v) => `<button class="chip${on ? ' on' : ''}" data-act="${act}" data-k="${k}" data-v="${esc(v)}">${esc(l)}</button>`;
+  $('#phs').innerHTML = chip('fph', 'ph', '', !F.ph.length, 'Todas') + Object.entries(PH).map(([k, l]) => chip('fph', 'ph', k, F.ph.includes(k), l)).join('');
+  $('#fb').innerHTML = ['age', 'tag', 'mat'].map(k => `<button class="chip${F[k].length ? ' on' : ''}" data-act="fopen" data-k="${k}">${LB[k]}${F[k].length ? ` (${F[k].length})` : ''} ${fopen == k ? '▴' : '▾'}</button>`).join('');
+  $('#fp').innerHTML = fopen ? opts[fopen].map(v => chip('fchip', fopen, v, F[fopen].includes(v))).join('') : '';
+  $('#fp').style.display = fopen ? '' : 'none';
+  $('#fc').hidden = !(F.ph.length + F.tag.length + F.mat.length + F.age.length);
+  const sorts = club
+    ? {new: (a, b) => (b.ts || 0) - (a.ts || 0), az: (a, b) => a.title.localeCompare(b.title, 'es')}
     : {old: (a, b) => (a.lastUsed || '').localeCompare(b.lastUsed || ''), new: (a, b) => (b.lastUsed || '').localeCompare(a.lastUsed || ''),
        az: (a, b) => a.title.localeCompare(b.title, 'es'), most: (a, b) => (b.uses || 0) - (a.uses || 0)};
   const sk = sorts[F.sort] ? F.sort : Object.keys(sorts)[0];
   const sopt = club ? [['new', 'Más recientes'], ['az', 'A-Z']] : [['old', 'Más tiempo sin usar'], ['new', 'Usados hace poco'], ['az', 'A-Z'], ['most', 'Más usados']];
-  $('#ft').innerHTML = opt(tags, F.tag, 'Etiqueta'); $('#fm').innerHTML = opt(mats, F.mat, 'Material'); $('#fa').innerHTML = opt(AGES, F.age, 'Edad / categoría');
   $('#fs').innerHTML = sopt.map(([v, l]) => `<option value="${v}"${sk == v ? ' selected' : ''}>${l}</option>`).join('');
-  const q = F.q.toLowerCase();
-  const r = src.filter(e => (!F.ph || e.phase == F.ph) && (!F.tag || (e.tags || []).includes(F.tag)) && (!F.mat || (e.material || []).includes(F.mat)) && (!F.age || e.age == F.age) &&
+  // AND entre categorías, OR dentro de cada una
+  const q = F.q.toLowerCase(), any = (sel, arr) => !sel.length || arr.some(x => sel.includes(x));
+  const r = src.filter(e => (!F.ph.length || F.ph.includes(e.phase)) && (!F.age.length || F.age.includes(e.age)) &&
+    any(F.tag, e.tags || []) && any(F.mat, e.material || []) &&
     (!q || [e.title, e.desc, ...(e.tags || []), ...(e.material || [])].join(' ').toLowerCase().includes(q)));
   r.sort(sorts[sk]);
   $('#cnt').textContent = `(${r.length}/${src.length})`;
@@ -165,7 +175,7 @@ app.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   const a = b.dataset.act, id = b.dataset.id, v = b.dataset.v, ex = () => list.find(x => x.id == id);
   ({
-    login: () => auth('login'), register: () => auth('register'), google: () => auth('google'), reset: () => auth('reset'), logout: () => DB.logout(),
+    login: () => auth('login'), reset: () => auth('reset'), logout: () => DB.logout(),
     new: () => edit(), edit: () => edit(ex()),
     goT: () => T.open(),
     scope: () => { F.scope = v; if (v == 'club') C.watch(true); showList(); },
@@ -177,13 +187,17 @@ app.addEventListener('click', e => {
     save: () => save(), saveNew: () => save(1),
     ph: () => { d.phase = v; dirty = true; drawChips(); }, tg: () => toggle(d.tags, v), mt: () => toggle(d.material, v),
     addTag: () => addItem('#n-tag', d.tags), addMat: () => addItem('#n-mat', d.material),
-    min: () => { $('#f-m').value = b.dataset.n; dirty = true; }, fph: () => { F.ph = v; renderList(); }
+    min: () => { $('#f-m').value = b.dataset.n; dirty = true; },
+    fph: () => { v ? toggleF('ph', v) : F.ph = []; renderList(); },
+    fopen: () => { const k = b.dataset.k; fopen = fopen == k ? '' : k; renderList(); },
+    fchip: () => { toggleF(b.dataset.k, v); renderList(); },
+    fclear: () => { F.ph = []; F.tag = []; F.mat = []; F.age = []; renderList(); }
   })[a]?.();
 });
 app.addEventListener('input', e => { if (e.target.id == 'q') { F.q = e.target.value; renderList(); } else if (view == 'edit') dirty = true; });
 app.addEventListener('change', e => {
   if (e.target.id == 'imp-f') { const f = e.target.files[0]; e.target.value = ''; f && importar(f); return; }
-  const m = {ft: 'tag', fm: 'mat', fa: 'age', fs: 'sort'}[e.target.id]; if (m) { F[m] = e.target.value; renderList(); }
+  if (e.target.id == 'fs') { F.sort = e.target.value; renderList(); }
 });
 app.addEventListener('keydown', e => {
   if (e.key == 'Enter' && e.target.id == 'n-tag') addItem('#n-tag', d.tags);
