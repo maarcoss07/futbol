@@ -15,7 +15,13 @@ function elSvg(o,sl){const t=o.t;let s='';
  else if(t=='num'){const n=o.n??1;s=`<circle r="13" fill="#fff" stroke="#111" stroke-width="2.5"/><text y="${n>9?5:6}" text-anchor="middle" font-size="${n>9?14:17}" font-weight="700" fill="#111" font-family="sans-serif">${n}</text>`}
  const r=R[t]||26;
  return `<g data-id="${o.id}" transform="translate(${o.x} ${o.y}) rotate(${o.r||0})"><circle r="${r}" fill="transparent"/>${s}${sl?`<circle r="${r}" fill="none" stroke="#38bdf8" stroke-width="3" stroke-dasharray="6 5"/>`:''}</g>`}
-function aPath(a){const p=a.p;
+function cutEnd(p,n){const q=p.map(x=>[...x]);
+ while(q.length>1){const a=q[q.length-1],b=q[q.length-2],L=Math.hypot(a[0]-b[0],a[1]-b[1]);
+  if(L>n){const f=n/L;q[q.length-1]=[+(a[0]+(b[0]-a[0])*f).toFixed(1),+(a[1]+(b[1]-a[1])*f).toFixed(1)];break}
+  if(q.length==2){q[1]=[b[0]+(a[0]-b[0])*.05,b[1]+(a[1]-b[1])*.05];break}
+  n-=L;q.pop()}
+ return q}
+ function aPath(a){const p=cutEnd(a.p,a.k=='drib'?17:13);
  if(a.k=='drib'){const o=[];let s=0;
   for(let i=1;i<p.length;i++){const[x0,y0]=p[i-1],[x1,y1]=p[i],dx=x1-x0,dy=y1-y0,L=Math.hypot(dx,dy)||1,nx=-dy/L,ny=dx/L;
    for(let d=i==1?0:5;d<=L;d+=5){const w=7*Math.sin(2*Math.PI*(s+d)/26);o.push((x0+dx*d/L+nx*w).toFixed(1)+' '+(y0+dy*d/L+ny*w).toFixed(1))}

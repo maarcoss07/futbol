@@ -1,8 +1,7 @@
 // db.js · Firebase modular por CDN (plan Spark): solo Auth + Firestore.
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {getAuth,onAuthStateChanged,signInWithPopup,GoogleAuthProvider,signInWithEmailAndPassword,createUserWithEmailAndPassword,sendPasswordResetEmail,signOut} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,onSnapshot,addDoc,setDoc,deleteDoc} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-
+import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,onSnapshot,addDoc,setDoc,deleteDoc,writeBatch,increment} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 // ====== PEGA AQUÍ TU firebaseConfig (Consola Firebase → Configuración del proyecto → Tus apps) ======
 export const firebaseConfig = {
   apiKey: "AIzaSyBbN1q77I3-8vO7FHR1MQl-POwZH_np-rU",
@@ -50,3 +49,18 @@ export function saveExercise(ex) {
 export const deleteExercise = id => deleteDoc(ref(id));
 export const duplicateExercise = ex =>
   saveExercise({...ex, id: null, title: ex.title + ' (copia)', uses: 0, lastUsed: null, ts: Date.now()});
+// ---- Entrenos (users/{uid}/sessions) ----
+const scol = () => collection(db, 'users', auth.currentUser.uid, 'sessions');
+export const watchSessions = (cb, err) => onSnapshot(scol(), s => cb(s.docs.map(x => ({...x.data(), id: x.id}))), err);
+export function saveSession(s) {
+  const {id, ...r} = s, data = {...r, ts: r.ts || Date.now()};
+  return id ? setDoc(doc(db, 'users', auth.currentUser.uid, 'sessions', id), data) : addDoc(scol(), data);
+}
+export const deleteSession = id => deleteDoc(doc(db, 'users', auth.currentUser.uid, 'sessions', id));
+// Un solo lote atómico: marca la sesión y actualiza último uso (+1 uso) de cada ejercicio
+export function completeSession(id, ups) {
+  const b = writeBatch(db);
+  ups.forEach(u => b.update(ref(u.id), {lastUsed: u.lastUsed, uses: increment(1)}));
+  b.update(doc(db, 'users', auth.currentUser.uid, 'sessions', id), {done: true, doneAt: Date.now()});
+  return b.commit();
+}

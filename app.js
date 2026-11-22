@@ -1,11 +1,12 @@
 // app.js · Interfaz: login, listado con filtros y formulario de ejercicio
 import {createBoard, thumbSvg, EMPTY} from './pizarra.js';
 import * as DB from './db.js';
+import {initEntrenos} from './entrenos.js';
 
 const $ = s => document.querySelector(s), app = $('#app');
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 const clone = o => JSON.parse(JSON.stringify(o));
-const PH = {warm: 'Calentamiento', main: 'Parte Principal', final: 'Final / Lúdico'};
+const PH = {warm: 'Calentamiento', main: 'Parte Principal', final: 'Finalización'};
 const DT = ['Presión', 'Finalización / chute', 'Pase y control', 'Conducción', 'Rondos / posesión', 'Defensa', 'Amplitud', '1 contra 1', 'Coordinación'];
 const DM = ['Conos', 'Petos', 'Balones', 'Minis porterías', 'Picas', 'Aros'];
 const ERR = {'auth/invalid-credential': 'Email o contraseña incorrectos', 'auth/invalid-email': 'Email no válido', 'auth/email-already-in-use': 'Ese email ya tiene cuenta',
@@ -23,6 +24,7 @@ const last = e => {
   const n = Math.floor((Date.now() - new Date(e.lastUsed + 'T00:00')) / 864e5);
   return n <= 0 ? 'Usado hoy' : n < 14 ? `hace ${n} d` : `hace ${Math.round(n / 7)} sem`;
 };
+const T = initEntrenos({app, DB, getList: () => list, PH, esc, toast, thumbSvg, onBack: () => showList(), setView: v => view = v});
 
 /* ---------- Login ---------- */
 function login() {
@@ -49,9 +51,7 @@ async function auth(kind) {
 function showList() {
   view = 'list';
   app.innerHTML = `<div class="max-w-5xl mx-auto p-3 pb-28"><div class="flex items-center gap-2 mb-3">
-  <h1 class="text-xl font-bold mr-auto">Ejercicios <span id="cnt" class="text-sm font-normal" style="color:var(--mu)"></span></h1><button class="btn sm" data-act="logout">Salir</button></div>
-  <div class="card p-3 grid gap-2 mb-3"><input id="q" class="inp" placeholder="Buscar…" value="${esc(F.q)}"><div class="flex gap-1.5 flex-wrap" id="phs"></div>
-  <div class="grid grid-cols-3 gap-2"><select id="ft" class="inp"></select><select id="fm" class="inp"></select><select id="fs" class="inp"></select></div></div>
+  <button class="chip on">Ejercicios <span id="cnt" class="text-xs"></span></button><button class="chip" data-act="goT">Entrenos</button><span class="mr-auto"></span><button class="btn sm" data-act="logout">Salir</button></div>  <div class="grid grid-cols-3 gap-2"><select id="ft" class="inp"></select><select id="fm" class="inp"></select><select id="fs" class="inp"></select></div></div>
   <div id="list" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"></div>
   <p class="text-xs mt-6" style="color:var(--mu)">Tu UID (para las reglas de Firestore): ${esc(user.uid)}</p></div>
   <button class="fab" data-act="new" title="Nuevo ejercicio">＋</button>`;
@@ -135,6 +135,7 @@ app.addEventListener('click', e => {
   ({
     login: () => auth('login'), register: () => auth('register'), google: () => auth('google'), reset: () => auth('reset'), logout: () => DB.logout(),
     new: () => edit(), edit: () => edit(ex()),
+    goT: () => T.open(),
     dup: () => { DB.duplicateExercise(ex()).catch(err => toast('Error: ' + err.message)); toast('Duplicado'); },
     del: () => { const x = ex(); if (x && confirm(`¿Borrar "${x.title}"?`)) DB.deleteExercise(id).catch(err => toast('Error: ' + err.message)); },
     back: () => { if (dirty && !confirm('¿Descartar los cambios?')) return; board?.destroy(); board = null; showList(); },
@@ -160,6 +161,7 @@ if (!DB.configured) {
     if (!u) { board?.destroy(); board = null; login(); return; }
     unsub = DB.watchExercises(arr => { list = arr; if (view == 'list') renderList(); },
       err => toast('Sin acceso a Firestore: revisa las reglas y tu UID (' + err.code + ')'));
+      T.watch(true);
     showList();
   });
 }
