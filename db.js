@@ -1,7 +1,8 @@
 // db.js · Firebase modular por CDN (plan Spark): solo Auth + Firestore.
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import {getAuth,onAuthStateChanged,signInWithPopup,GoogleAuthProvider,signInWithEmailAndPassword,createUserWithEmailAndPassword,sendPasswordResetEmail,signOut} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,onSnapshot,addDoc,setDoc,deleteDoc,writeBatch,increment, getDocs} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,doc,onSnapshot,addDoc,setDoc,deleteDoc,writeBatch,increment,getDocs} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
 // ====== PEGA AQUÍ TU firebaseConfig (Consola Firebase → Configuración del proyecto → Tus apps) ======
 export const firebaseConfig = {
   apiKey: "AIzaSyBbN1q77I3-8vO7FHR1MQl-POwZH_np-rU",
@@ -26,12 +27,15 @@ if (configured) {
 const flat = b => ({...b, arrows: (b.arrows || []).map(a => ({...a, p: a.p.flat()}))});
 const unflat = b => ({...b, arrows: (b.arrows || []).map(a => ({...a, p: a.p.reduce((r, v, i) => (i % 2 ? r[r.length - 1].push(v) : r.push([v]), r), [])}))});
 
-// UID del usuario → UID de la carpeta que comparte (segundos entrenadores)
-const EQUIPO = {
-  'UID_SEGUNDO_1': 'aE4xgApvUbcVNqMNnU1OjRPJPb03',
-  'UID_SEGUNDO_2': 'aE4xgApvUbcVNqMNnU1OjRPJPb03'
+// ====== EQUIPOS DEL CLUB: UID del 1.er entrenador → [UIDs de sus segundos entrenadores] ======
+const EQUIPOS = {
+  'aE4xgApvUbcVNqMNnU1OjRPJPb03': ['UID_SEGUNDO_1', 'UID_SEGUNDO_2']
+  // , 'UID_PRIMERO_OTRO_EQUIPO': ['UID_SEGUNDO_3']
 };
+const EQUIPO = Object.fromEntries(Object.entries(EQUIPOS).flatMap(([p, ss]) => ss.map(s => [s, p])));
 const carpeta = () => EQUIPO[auth.currentUser.uid] || auth.currentUser.uid;
+export const miCarpeta = () => carpeta();
+
 const col = () => collection(db, 'users', carpeta(), 'exercises');
 const ref = id => doc(db, 'users', carpeta(), 'exercises', id);
 export const onUser = cb => onAuthStateChanged(auth, cb);
@@ -45,15 +49,21 @@ export const logout = () => signOut(auth);
 export const watchExercises = (cb, err) => onSnapshot(col(), s =>
   cb(s.docs.map(x => { const v = x.data(); return {...v, id: x.id, board: unflat(v.board || {})}; })), err);
 
-// No hacer await en la UI: offline la promesa tarda hasta tener conexión, pero la caché local ya se actualiza
+const cref = id => doc(db, 'club_exercises', id);
+// Un solo lote atómico: guarda en la carpeta privada y sincroniza con club_exercises según "public"
 export function saveExercise(ex) {
   const {id, board, ...r} = ex;
-  const data = {...r, board: flat(board), ts: r.ts || Date.now()};
-  return id ? setDoc(ref(id), data) : addDoc(col(), data);
+  const data = {...r, board: flat(board), public: !!r.public, ts: r.ts || Date.now()};
+  const rf = id ? ref(id) : doc(col()), b = writeBatch(db);
+  b.set(rf, data);
+  if (data.public) { const {uses, lastUsed, ...pub} = data; b.set(cref(rf.id), {...pub, owner: carpeta(), upd: Date.now()}); }
+  else b.delete(cref(rf.id));
+  return b.commit();
 }
-export const deleteExercise = id => deleteDoc(ref(id));
+export function deleteExercise(id) { const b = writeBatch(db); b.delete(ref(id)); b.delete(cref(id)); return b.commit(); }
 export const duplicateExercise = ex =>
-  saveExercise({...ex, id: null, title: ex.title + ' (copia)', uses: 0, lastUsed: null, ts: Date.now()});
+  saveExercise({...ex, id: null, title: ex.title + ' (copia)', uses: 0, lastUsed: null, public: false, ts: Date.now()});
+
 // ---- Entrenos (users/{carpeta}/sessions) ----
 const scol = () => collection(db, 'users', carpeta(), 'sessions');
 const sref = id => doc(db, 'users', carpeta(), 'sessions', id);
@@ -78,7 +88,8 @@ export async function exportAll() {
 export async function importAll(D) {
   if (!D || D.app != 'banco-ejercicios' || !Array.isArray(D.exercises) || !Array.isArray(D.sessions)) throw new Error('Archivo no válido');
   if (!navigator.onLine) throw new Error('Necesitas conexión para importar');
-  const ops = [...D.exercises.map(x => [ref(x.id), x]), ...D.sessions.map(x => [sref(x.id), x])];
+  const ops = [...D.exercises.map(x => [ref(x.id), x]), ...D.sessions.map(x => [sref(x.id), x]),
+    ...D.exercises.filter(x => x.public).map(({id, uses, lastUsed, ...p}) => [cref(id), {...p, owner: carpeta()}])];
   for (let i = 0; i < ops.length; i += 400) {
     const b = writeBatch(db);
     ops.slice(i, i + 400).forEach(([r, {id, ...data}]) => b.set(r, data));
@@ -86,3 +97,9 @@ export async function importAll(D) {
   }
   return ops.length;
 }
+
+// ---- Club ----
+export const watchClub = (cb, err) => onSnapshot(collection(db, 'club_exercises'), s =>
+  cb(s.docs.map(x => { const v = x.data(); return {...v, id: x.id, board: unflat(v.board || {})}; })), err);
+export const copyFromClub = e => saveExercise({title: e.title, desc: e.desc || '', phase: e.phase, tags: e.tags || [], min: e.min || 0,
+  players: e.players || '', material: e.material || [], age: e.age || '', board: e.board, uses: 0, lastUsed: null, public: false});

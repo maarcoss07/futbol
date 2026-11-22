@@ -1,5 +1,5 @@
 // entrenos.js · Entrenos: lista, creador manual, generador automático y Modo campo
-export function initEntrenos({app, DB, getList, PH, esc, toast, thumbSvg, onBack, setView}) {
+export function initEntrenos({app, DB, getList, getTags, PH, esc, toast, thumbSvg, onBack, setView}) {
   const BL = ['warm', 'main', 'final'], $ = s => document.querySelector(s), clone = o => JSON.parse(JSON.stringify(o));
   let sessions = [], unsub = null, cur = null, mode = '', bdirty = 0, wake = null, pickB = '', pickAll = false;
   const gen = {n: {warm: 1, main: 2, final: 1}, tags: []};
@@ -47,7 +47,7 @@ export function initEntrenos({app, DB, getList, PH, esc, toast, thumbSvg, onBack
   }
   function build() {
     const y = scrollY; mode = 'build'; setView('ent');
-    const tags = [...new Set(getList().flatMap(e => e.tags || []))].sort((a, b) => a.localeCompare(b, 'es'));
+    const tags = getTags();
     const blk = b => { const it = items(b); return `<div class="card p-3"><div class="flex items-center mb-2"><b class="mr-auto">${PH[b]}</b><span class="text-xs" style="color:var(--mu)">${mins(it)} min</span></div>
       <div class="grid gap-3">${it.map(row).join('') || '<p class="text-xs" style="color:var(--mu)">Vacío</p>'}</div><button class="btn sm mt-3" data-act="t-add" data-b="${b}">＋ Añadir ejercicio</button></div>`; };
     app.innerHTML = `<div class="max-w-3xl mx-auto p-3 pb-28 grid gap-3">
